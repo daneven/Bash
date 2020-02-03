@@ -1,0 +1,44 @@
+
+#!/bin/bash
+##################################################################################################
+# Params    *  $1 - DB directorie on Raemis * $2 - DB  filename * $3- backup Directory on Nicita #
+#           *                                                                                                                           *                                                                         $
+# defaults  *         /usr/share/raemis/db/ *    raemis.db      *   /home/bscell/backups         #
+##################################################################################################
+
+
+#####################################test input params or set default############################
+if [ "$#" -ne 3 ]
+  then
+                echo "Wrong number of parameters recieved "
+                origdir="/usr/share/raemis/db/"
+                dbfilename="raemis.db"
+          backupdir="/home/bscell/backups"
+
+    echo "Using default DB location :  /usr/share/raemis/db "
+                echo "Using default DB filename : raemis.db "
+                echo "Using default backup dir : /home/bscell/backups "
+        else
+                origdir="$1"
+                dbfilename="$2"
+                backupdir="$3"
+                echo "Recieved DB location : "$origdir" "
+                echo "Recieved DB filename : "$dbfilename" "
+                echo "Recieved backup dir : "$backupdir" "
+fi
+
+
+####################check locations and file#####################################################
+
+ssh root@raemis [ -d "$origdir" ] && echo "Directory $origdir OK." || { echo "Error: Directory $origdir  at Raemis not reachable." ;  exit 1; }
+ssh root@raemis [ -f "$origdir/$dbfilename" ] && echo "DBfile  $dbfilename ok." || { echo "Error: DBfile $dbfilename  not reachable." ;  exit 1; }
+[ -d "$backupdir" ] && echo "Directory $backupdir  OK." || { mkdir $backupdir  && echo "Warning: Creating Directory $backupdir ." || exit 1; }
+
+#################################create and transfer backup #############################
+
+bfilename="RaemisDB_$(date +"%m%d%y_%k%M")"
+ scp root@raemis:$origdir/$dbfilename $backupdir/$bfilename && echo "Succes: File "$bfilename" copied."  || { echo "Error: Failed to copy file " ; exit 1; }
+ gzip -f  "$backupdir/$bfilename" && echo "Succes: File "$bfilename" archived. "  || { echo "Error: Failed to archive file "$bfilename""  ; exit 1; }
+###################################################remove old archive ( older than 14 days )###########################
+echo "Checking for Old files to remove " ;find "$backupdir" -type f -name 'RaemisDB_*' -mtime 14  -exec rm {} \;
+exit 0
