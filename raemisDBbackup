@@ -35,7 +35,7 @@ ssh root@raemis [ -d "$origdir" ]  && echo "Directory $origdir OK." || { echo "E
 ssh root@raemis [ -f "$origdir/$dbfilename" ]  && echo "DBfile  $dbfilename ok." || { echo "Error: DBfile $dbfilename  not reachable." ;  exit 1; } ;
 
 [ -d "$backupdir" ] && echo "Directory $backupdir  OK." || { mkdir $backupdir  && echo "Warning: Creating Directory $backupdir ." || exit 1; }
-echo $HOME/$backupdir
+
 ################################create and transfer backup #############################
 bfilename="RaemisDB_$(date +"%m%d%y%H%M")"
 #echo " root@raemis:${origdir}/${dbfilename} ${backupdir}/${bfilename}"
