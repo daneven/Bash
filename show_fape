@@ -1,0 +1,260 @@
+#!/bin/bash
+
+
+#OBJECTS
+
+#ap_list
+#show_db_val
+#fap_status
+#fap_technology
+#umts_fap_info
+#lte_fap_info
+#umts_fap_parameters
+#lte_fap_parameters
+#umts_radio_parameters
+#lte_radio_parameters
+#more_parameters
+#access_point_picking
+#access_points_parameters
+#script
+
+# creating a list of accses point connected to the local computer
+ap_list()
+{
+    ap_list=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select id from cpes;"`
+#echo "$ap_list"
+}
+
+# creating a function that can export parameter from db
+show_db_val()
+{
+    path=$1
+    leaf=$2
+
+    value=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select value from cpeData where id_cpeId='$ap' and path='$path' and leaf='$leaf'" 2>&1`
+    printf "%-40s %s\n" "$leaf" "$value"
+
+}
+
+# checking status state
+fap_status()
+{
+    path=$1
+
+    AdminState=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select value from cpeData where id_cpeId='$ap' and path='$path' and leaf='AdminState'"`
+    OpState=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select value from cpeData where id_cpeId='$ap' and path='$path' and leaf='OpState'"`
+    if [ "$OpState"  = "true" ]
+        then
+            if [ "$AdminState" = "true" ]
+                then
+                    fap_status="transmiting"
+                else
+                    fap_status="not transmiting"
+            fi
+        else
+            if [ "$fap_technology" = "LTE" ]
+                then
+                    fap_status="not connected"
+                else
+                    fap_status="not transmiting"
+            fi
+    fi
+    printf "%-40s %s\n" "FapStatus" "$fap_status"
+
+}
+
+# checking technology
+fap_technology()
+{
+    fap_technology=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select path from cpeData where id_cpeId='$ap' and path='Device.Services.FAPService.1.CellConfig.UMTS' and value!='TunnelInstance'" | cut -d\. -f6`
+    if test -z  "$fap_technology"
+        then
+            fap_technology="LTE"
+    fi
+}
+
+####################################PRINT DATA #######################################################
+umts_fap_info()
+{
+    fap_technology
+    printf "%-40s %s\n" "FapTechnology" "$fap_technology"
+    show_db_val Device.DeviceInfo SerialNumber
+    show_db_val Device.IP.Interface.1.IPv4Address.1 IPAddress
+    fap_status Device.Services.FAPService.1.FAPControl.UMTS
+}
+
+
+
+lte_fap_info()
+{
+    fap_technology
+    printf "%-40s %s\n" "FapTechnology" "$fap_technology"
+    show_db_val Device.DeviceInfo SerialNumber
+    show_db_val Device.IP.Interface.1.IPv4Address.1 IPAddress
+    fap_status Device.Services.FAPService.1.FAPControl.LTE
+}
+
+# access pount parameters
+umts_fap_parameters()
+{
+#    echo -e "\nFAP Parameters\n--------------"
+    show_db_val Device.Services.FAPService.1.CellConfig.UMTS.RAN CellID
+    show_db_val Device.Services.FAPService.1.CellConfig.UMTS.CN PLMNID
+    show_db_val Device.Services.FAPService.1.CellConfig.UMTS.CN LACInUse
+}
+
+lte_fap_parameters()
+{
+#    echo -e "\nFAP Parameters\n--------------"
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.RAN.Common CellIdentity
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.EPC.PLMNList.1 PLMNID
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.EPC TAC
+}
+
+# access point radio parameters
+umts_radio_parameters()
+{
+#    echo -e "\nRadio Parameters\n------------------"
+    show_db_val Device.Services.FAPService.1.CellConfig.UMTS.RAN.RF UARFCNDLInUse
+    show_db_val Device.Services.FAPService.1.CellConfig.UMTS.RAN.RF PrimaryScramblingCodeInUse
+    show_db_val Device.Services.FAPService.1.CellConfig.UMTS.RAN.RF PCPICHPower
+    show_db_val Device.Services.FAPService.1.CellConfig.UMTS.RAN.RF X_000295_PrimaryCpichPowerPercent
+    show_db_val Device.Services.FAPService.1.REM X_000295_ExternalPaGain
+    echo ""
+}
+
+
+
+lte_radio_parameters()
+{
+#    echo -e "\nRadio Parameters\n------------------"
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.RAN.RF EARFCNDL
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.RAN.RF PhyCellID
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.RAN.RF FreqBandIndicator
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.RAN.RF DLBandwidth
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.RAN.RF ULBandwidth
+    show_db_val Device.Services.FAPService.1.Capabilities MaxTxPower
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.RAN.RF ReferenceSignalPower
+    show_db_val Device.Services.FAPService.1.CellConfig.LTE.RAN.RF X_000295_ExternalPAGain
+    echo ""
+}
+###########################################Dan#######################
+PA_status()
+{
+echo "                           P_Amp status from log                                 "
+sn=$(show_db_val Device.DeviceInfo SerialNumber| awk '{print $2}') #serial number of fap
+#echo ${sn}  #to mask
+log=$( journalctl -u pa_status.service  --since "2 minutes ago" | grep ${sn} -m1)
+#echo  ${log}
+log=$( cut -d "]" -f 2 <<< "$log")
+log=$( cut -d "-" -f 2 <<< "$log")
+#echo "log after cut"  ${log}
+
+pstatus=`echo ${log} |awk  '{print $2}' | sed 's/.$//'`
+ptemp=`echo ${log} |awk  '{print $3}'| sed 's/.$//'`
+ppower=`echo ${log} |awk  '{print $4}'| sed 's/.$//'`
+[[ "$pstatus" =~ "OK" ]] && echo -e "\e[1;32m${pstatus}\e[0m" ||echo -e "\e[1;91m${pstatus}\e[0m"
+echo "${ptemp}"
+[[ "$ppower" =~ "0d" ]]||[[ "$ppower" =~ "NAd" ]]  && echo -e "\e[1;93m${ppower}\e[0m" ||echo -e "\e[1;32m${ppower}\e[0m"
+echo "*********************************************************************************"
+
+
+}
+
+# offering user to gain more information about one of the access points
+#more_parameters()
+#{
+#    first_ans=""
+#    while [ "$first_ans" != "y" ] && [ "$first_ans" != "n" ]
+#        do
+#            echo -ne "\n\n\nWould you like to know some more information about one of the access points? (y/n) "
+#            read first_ans
+#        done
+#}
+
+
+# asking user which access point it is that he would like to know more about
+#access_point_picking()
+#{
+#    echo -en "\n\n\n\nWhich access point would it be? "
+#    read ap_pick
+#fap_list=`sudo sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select id from cpes"`
+#for fap in $fap_list
+#do
+#version=`sudo sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select * from cpeData where id_cpeId='$fap'" | grep -i \|softwareversion|cut -d':' -f 4|cut -d'|' -f 1`
+
+#    selected_ap=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select eid from cpes" | grep "$ap_pick"`
+#    while [ `echo $selected_ap | wc -w` -ne 1 ]
+#        do
+#            if [ `echo $selected_ap | wc -w` -ne 0 ]
+#                then
+#                    echo -e "\n\nPlease be more specific:\n"
+#                else
+#                    echo -e "\n\nPlease enter an existing access point id number:\n"
+#            fi
+#            read ap_pick
+#            selected_ap=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select eid from cpes" | grep "$ap_pick"`
+#        done
+#    ap_eid=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select eid from cpes" | grep "$ap_pick"`
+#    ap=`sqlite3 /opt/ipaccess/ipatestbox_tr69acs.db "select * from cpes" | grep "$ap_pick" | cut -d\| -f1`
+#}
+
+
+# outputing general information about connected accass point
+access_points_parameters()
+{
+#    clear
+    for ap in `echo $ap_list`
+        do
+            fap_technology
+            if [ "$fap_technology" = "LTE" ]
+                then
+                    lte_fap_info
+		    lte_fap_parameters
+                    lte_radio_parameters
+                    PA_status
+                else
+                    umts_fap_info
+                    umts_fap_parameters
+		    umts_radio_parameters
+		    PA_status
+            fi
+        done
+}
+
+
+
+# script
+script()
+{
+    ap_list
+
+    access_points_parameters
+
+#    more_parameters
+
+#    while [ "$first_ans" = "y" ]
+#        do
+#            access_points_parameters
+#            access_point_picking
+            fap_technology
+#            clear
+#            echo -e "Access Point: " $ap_eid "\n================================\n"
+#                if [ "$fap_technology" = "LTE" ]
+#                    then
+#                        lte_fap_parameters
+#                        lte_radio_parameters
+#                    else
+#                        umts_fap_parameters
+#                        umts_radio_parameters
+#                fi
+#            more_parameters
+#       done
+
+#    clear
+#    clear
+}
+
+# running script
+echo ""
+script
