@@ -43,5 +43,5 @@ bfilename="RaemisDB_$(date +"%m%d%y%H%M")"
  gzip -f  "$backupdir/$dbfilename" && echo "Succes: File "$dbfilename" archived. "  || { echo "Error: Failed to archive file "$bfilename""  ; exit 1; }
 mv "$backupdir/${dbfilename}.gz"  "$backupdir/${bfilename}.gz"
 ###################################################remove old archive ( older than 14 days )###########################
-echo "Checking for Old files to remove " ;find "$backupdir" -type f -name 'RaemisDB_*' -mtime 14  -exec rm {} \;
+echo "Checking for Old files to remove " ;find "$backupdir" -type f -name 'RaemisDB_*' -mtime +14  -exec rm {} \;
 exit 0
