@@ -1,0 +1,5 @@
+#!/bin/bash
+#/usr/lib/systemd/system-sleep/fix-touchpad.sh
+[ "$1" = "pre" ] && modprobe -r i2c_hid
+[ "$1" = "post" ] && modprobe i2c_hid
+exit 0
